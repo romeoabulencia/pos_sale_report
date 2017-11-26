@@ -51,7 +51,7 @@ class pos_sale_report(models.Model):
 
     # WARNING : this code doesn't handle uom conversion for the moment
     def _sale_order_select(self):
-        select = """SELECT sol.id AS id,
+        select = """SELECT sol.id AS sol_id,
             so.date_order::date AS date,
             sol.product_id AS product_id,
             sloo.lot_id AS prodlot_id,
@@ -70,7 +70,7 @@ class pos_sale_report(models.Model):
             GROUP BY sol.id, so.date_order, sol.product_id, pp.product_tmpl_id, sloo.lot_id, sloo.owner_id, sol.price_unit, (sol.price_unit * sol.product_uos_qty),
             so.company_id
  union
- SELECT sol.id AS id,
+ SELECT sol.id AS sol_id,
             so.date_order::date AS date,
             sol.product_id AS product_id,
             sloo.lot_id AS prodlot_id,
@@ -94,7 +94,7 @@ class pos_sale_report(models.Model):
         return select
 
     def _pos_order_select(self):
-        select = """SELECT pol.id AS id,
+        select = """SELECT pol.id AS pol_id,
             po.date_order::date AS date,
             pol.product_id AS product_id,
 	    pol.prodlot_id AS prodlot_id,
@@ -117,36 +117,16 @@ class pos_sale_report(models.Model):
     def init(self, cr):
         tools.drop_view_if_exists(cr, self._table)
         #tools.drop_view_if_exists(cr,"sale_lot_owner_order")
-	cr.execute("""create or replace view sale_lot_owner_order AS select tmp.lot_id, tmp.owner_id, aa.sale_order_ln_id 
-	from (select lot_id, owner_id from public.stock_pack_operation
-	where purchase_order_ln_id in (select id FROM public.purchase_order_line) 
-	and lot_id in(SELECT lot_id FROM public.stock_pack_operation where sale_order_ln_id in(SELECT id FROM public.sale_order_line))) tmp,
-	(select bb.lot_id,bb.sale_order_ln_id from public.stock_pack_operation bb where bb.sale_order_ln_id in(SELECT id FROM public.sale_order_line) ) aa 
-	where tmp.lot_id = aa.lot_id order by lot_id""")
-	#cr.execute("ALTER view sale_lot_owner_order OWNER TO odoo")
-	#cr.execute("grant all on public.sale_lot_owner_order to odoo, postgres")
-	cr.execute("CREATE OR REPLACE VIEW %s AS (%s UNION %s)" % (
-            self._table, self._sale_order_select(), self._pos_order_select()))
+    	cr.execute("""create or replace view sale_lot_owner_order AS select tmp.lot_id, tmp.owner_id, aa.sale_order_ln_id 
+    	from (select lot_id, owner_id from public.stock_pack_operation
+    	where purchase_order_ln_id in (select id FROM public.purchase_order_line) 
+    	and lot_id in(SELECT lot_id FROM public.stock_pack_operation where sale_order_ln_id in(SELECT id FROM public.sale_order_line))) tmp,
+    	(select bb.lot_id,bb.sale_order_ln_id from public.stock_pack_operation bb where bb.sale_order_ln_id in(SELECT id FROM public.sale_order_line) ) aa 
+    	where tmp.lot_id = aa.lot_id order by lot_id""")
+    	#cr.execute("ALTER view sale_lot_owner_order OWNER TO odoo")
+    	#cr.execute("grant all on public.sale_lot_owner_order to odoo, postgres")
+    	cr.execute("CREATE OR REPLACE VIEW %s AS (select *,row_number() over() as id  from (%s UNION %s) as x)" % (
+                self._table, self._sale_order_select(), self._pos_order_select()))
     
-    def read_group(self, cr, uid, domain, fields, groupby, offset=0, limit=None, context=None, orderby=False,lazy=True):
-        res = super(pos_sale_report, self).read_group(cr, uid, domain, fields, groupby, offset, limit, context, orderby,lazy)
-        #combines list elements having the same prodlot_id
 
-        prodlot_dict={}
-        for x in res:
-            if '__domain' in x and x['__domain'] and x['__domain'][0]:
-                prodlot_id=x['__domain'][0][2]
-                if prodlot_id not in prodlot_dict:
-                    prodlot_dict[prodlot_id]=x
-                else:
-                    prodlot_dict[prodlot_id]['__count']+=x['__count']
-                    prodlot_dict[prodlot_id]['qty']+=x['qty']
-                    prodlot_dict[prodlot_id]['total_sales_amount']+=x['total_sales_amount']
-                if prodlot_dict[prodlot_id]['__count'] !=  prodlot_dict[prodlot_id]['qty']:
-                    prodlot_dict[prodlot_id]['qty']=max(prodlot_dict[prodlot_id]['__count'],prodlot_dict[prodlot_id]['qty'])
-                    prodlot_dict[prodlot_id]['__count']=prodlot_dict[prodlot_id]['qty']
-        if prodlot_dict:
-            res = prodlot_dict.values()
-
-        return res
 	
