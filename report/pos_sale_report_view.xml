@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+<data>
+
+    <record id="salepos_analysis_graph" model="ir.ui.view">
+         <field name="name">salepos.analysis.graph</field>
+         <field name="model">pos.sale.report</field>
+         <field name="arch" type="xml">
+             <graph string="salepos Analysis" type="pivot" stacked="True">
+                 <field name="prodlot_id" type="row"/>
+                 <field name="origin" type="col"/>
+                 <field name="qty" type="measure"/>
+                 <field name="total_sales_amount" type="measure"/>
+             </graph>
+         </field>
+    </record>
+
+    <record id="salepos_analysis_graph_search" model="ir.ui.view">
+        <field name="name">salepos.analysis.search</field>
+        <field name="model">pos.sale.report</field>
+        <field name="arch" type="xml">
+            <search string="salepos Analysis">
+                
+				<field name="prodlot_id"/> 
+                <field name="owner_id"/>
+                
+                
+                
+                <separator/>
+                
+                <filter name="sold" string="Sold products" domain="[('prodlot_id.available_stock', '=', 0)]"/>
+                <filter name="available" string="Available products" domain="[('prodlot_id.available_stock', '=', 1)]"/>
+
+                <separator/>
+                <filter string="This Year" name="year" domain="[('in_date','&lt;=', time.strftime('%%Y-12-31')),('in_date','&gt;=',time.strftime('%%Y-01-01'))]"/>
+                <group expand="1" string="Group By">
+                    
+                    
+<!--                    <filter string="Serial Number" name="Lot" context="{'group_by':'prodlot_id'}"/> -->
+                    <filter string="Ownership" name="Ownership" context="{'group_by':'owner_id'}"/>
+               
+               
+               
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_salepos_analysis_graph" model="ir.actions.act_window">
+        <field name="name">salepos Analysis</field>
+        <field name="res_model">pos.sale.report</field>
+        <field name="view_type">form</field>
+        <field name="view_mode">graph</field>
+        <field name="search_view_id" ref="salepos_analysis_graph_search"/>
+        <field name="view_id" ref="salepos_analysis_graph"/>
+        <field name="context">{'search_default_internal_location':1}</field>
+    </record>
+
+    <menuitem action="action_salepos_analysis_graph" id="menu_action_salepos_analysis_graph" parent="stock.next_id_61"/>
+
+</data>
+</openerp>
+
