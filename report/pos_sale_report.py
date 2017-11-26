@@ -127,4 +127,26 @@ class pos_sale_report(models.Model):
 	#cr.execute("grant all on public.sale_lot_owner_order to odoo, postgres")
 	cr.execute("CREATE OR REPLACE VIEW %s AS (%s UNION %s)" % (
             self._table, self._sale_order_select(), self._pos_order_select()))
+    
+    def read_group(self, cr, uid, domain, fields, groupby, offset=0, limit=None, context=None, orderby=False,lazy=True):
+        res = super(pos_sale_report, self).read_group(cr, uid, domain, fields, groupby, offset, limit, context, orderby,lazy)
+        #combines list elements having the same prodlot_id
+
+        prodlot_dict={}
+        for x in res:
+            if '__domain' in x and x['__domain'] and x['__domain'][0]:
+                prodlot_id=x['__domain'][0][2]
+                if prodlot_id not in prodlot_dict:
+                    prodlot_dict[prodlot_id]=x
+                else:
+                    prodlot_dict[prodlot_id]['__count']+=x['__count']
+                    prodlot_dict[prodlot_id]['qty']+=x['qty']
+                    prodlot_dict[prodlot_id]['total_sales_amount']+=x['total_sales_amount']
+                if prodlot_dict[prodlot_id]['__count'] !=  prodlot_dict[prodlot_id]['qty']:
+                    prodlot_dict[prodlot_id]['qty']=max(prodlot_dict[prodlot_id]['__count'],prodlot_dict[prodlot_id]['qty'])
+                    prodlot_dict[prodlot_id]['__count']=prodlot_dict[prodlot_id]['qty']
+        if prodlot_dict:
+            res = prodlot_dict.values()
+
+        return res
 	
